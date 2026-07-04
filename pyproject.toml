@@ -1,3 +1,33 @@
 [build-system]
-requires = ["setuptools>=64.0"]
+requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "ipy-yasi"
+dynamic = ["version"]
+description = "DIY alternative to solve it from fast.ai (Yet-Another-SolveIt)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+authors = [{name = "Jack-Byte", email = "tobi.klings@t-online.de"}]
+keywords = ['nbdev', 'jupyter', 'notebook', 'python']
+classifiers = ["Natural Language :: English", "Intended Audience :: Developers", "Development Status :: 3 - Alpha", "Programming Language :: Python :: 3", "Programming Language :: Python :: 3 :: Only"]
+dependencies = ['ipylab>=1.1.0', 'openai>=1.86.0', 'docx2md>=1.0.2']
+
+[project.urls]
+Repository = "https://github.com/Jack-Byte/yasi"
+Documentation = "https://Jack-Byte.github.io/yasi"
+
+[project.entry-points.nbdev]
+yasi = "yasi._modidx:d"
+
+[project.optional-dependencies]
+dev = ['ipylab>=1.1.0', 'openai>=1.86.0', 'docx2md>=1.0.2']
+
+[tool.setuptools.dynamic]
+version = {attr = "yasi.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["yasi"]
+
+[tool.nbdev]
