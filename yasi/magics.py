@@ -9,8 +9,10 @@ __all__ = ['YasiMagics', 'load_prompt_magic']
 
 # %% ../nbs/04_magics.ipynb #98a7e49a
 from IPython.core.magic import Magics, magics_class, cell_magic
+from IPython.display import Markdown, display
 
 from .dialog import extract_dialog, notebook_upto_prompt
+from .client import format_usage
 
 @magics_class
 class YasiMagics(Magics):
@@ -21,7 +23,8 @@ class YasiMagics(Magics):
 
     @cell_magic
     def prompt(self, line, cell):
-        """Send the dialog up to (and including) this prompt cell, insert the response below"""
+        """Send the dialog up to (and including) this prompt cell, streaming the response into
+        the cell output and inserting it as a tagged markdown cell below"""
         jc = self.jc
         notebook = jc.get_current_nb()
         notebook, found = notebook_upto_prompt(notebook, cell)
@@ -31,18 +34,28 @@ class YasiMagics(Magics):
                                             tag_assistant=jc.tag_assistant,
                                             all_cells=jc.all_cells,
                                             max_output_len=jc.max_output_len,
-                                            hide_tag=jc.hide_tag)
+                                            hide_tag=jc.hide_tag,
+                                            system_prompt=jc.system_prompt)
         for warning in warnings:
             jc.create_new_markdown_cell(warning)
         if not found:
             # unsaved or edited prompt cell: still send the prompt itself
             messages.append({"role": "user", "content": cell.strip()})
+        handle = display(Markdown('*waiting for the model \u2026*'), display_id=True)
+        def on_chunk(text_so_far):
+            handle.update(Markdown(text_so_far))
         response_text = jc.chat_client.chat(messages,
                                             model=jc.model,
                                             max_tokens=jc.max_tokens,
                                             temperature=jc.temperature,
-                                            presence_penalty=jc.presence_penalty)
+                                            presence_penalty=jc.presence_penalty,
+                                            stream=True,
+                                            on_chunk=on_chunk)
+        handle.update(Markdown('*(response inserted below)*'))
         jc.latest_response = jc.chat_client.latest_response
+        ui = getattr(jc, 'ui', None)
+        if ui is not None:
+            ui.show_usage(format_usage(jc.chat_client.usage_log, getattr(jc, 'models', None)))
         jc.create_new_markdown_cell(f"{jc.tag_assistant}\n\n{response_text.strip()}")
 
 def load_prompt_magic(jc, # A JupyterChat instance the magic sends dialogs with

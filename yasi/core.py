@@ -11,8 +11,8 @@ __all__ = ['JupyterChat', 'tag_in_cell']
 from ipylab import JupyterFrontEnd
 import json
 
-from .dialog import tag_in_cell, extract_dialog
-from .client import ChatClient
+from .dialog import tag_in_cell, extract_dialog, SOLVEIT_SYSTEM_PROMPT
+from .client import ChatClient, format_usage, usage_totals
 from .ui import YasiUI
 from .magics import load_prompt_magic
 
@@ -29,7 +29,8 @@ class JupyterChat:
                  tag_assistant : str ='#| chat_assistant', # tag for assistant chat markdown cells
                  all_cells : bool =True, # send untagged markdown/code cells (incl. outputs) as user messages
                  max_output_len : int =2000, # maximum characters of rendered output per code cell
-                 hide_tag : str ='yasi-hide' # cells with this tag (metadata or `#| ` source line) are hidden from the model
+                 hide_tag : str ='yasi-hide', # cells with this tag (metadata or `#| ` source line) are hidden from the model
+                 system_prompt : str =SOLVEIT_SYSTEM_PROMPT # system prompt prepended to every dialog; pass your own, or None to disable
                 ):
         self.chat_client = ChatClient(api_key=api_key, openai_base_url=openai_base_url)
         self.client = self.chat_client.client  # kept for backward compatibility
@@ -44,6 +45,7 @@ class JupyterChat:
         self.all_cells = all_cells
         self.max_output_len = max_output_len
         self.hide_tag = hide_tag
+        self.system_prompt = system_prompt
 
         self.max_tokens = None
         self.temperature = None
@@ -68,6 +70,11 @@ class JupyterChat:
             ui = self.__dict__.get('ui')
             if ui is not None: return getattr(ui, name)
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
+    @property
+    def usage(self):
+        """Total token usage of this session"""
+        return usage_totals(self.chat_client.usage_log)
 
     def _on_model_change(self, model_id):
         self.model = model_id
@@ -100,6 +107,7 @@ class JupyterChat:
                                               temperature=self.temperature,
                                               presence_penalty=self.presence_penalty)
         self.latest_response = self.chat_client.latest_response
+        self.ui.show_usage(format_usage(self.chat_client.usage_log, self.models))
 
         # Insert a new cell below with the assistant's response, tagged so
         # the next extraction sends it with the assistant role
@@ -126,7 +134,8 @@ class JupyterChat:
                                             tag_assistant=self.tag_assistant,
                                             all_cells=self.all_cells,
                                             max_output_len=self.max_output_len,
-                                            hide_tag=self.hide_tag)
+                                            hide_tag=self.hide_tag,
+                                            system_prompt=self.system_prompt)
         for warning in warnings:
             self.create_new_markdown_cell(warning)
         return messages
