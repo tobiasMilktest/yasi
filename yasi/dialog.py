@@ -6,7 +6,8 @@ Docs: https://Jack-Byte.github.io/yasidialog.html.md"""
 
 # %% auto #0
 __all__ = ['PROMPT_MAGIC', 'tag_in_cell', 'cell_roles', 'strip_ansi', 'render_output', 'render_outputs', 'code_cell_content',
-           'is_prompt_cell', 'prompt_body', 'notebook_upto_prompt', 'multiple_tags_warning', 'extract_dialog']
+           'is_prompt_cell', 'prompt_body', 'notebook_upto_prompt', 'is_hidden', 'multiple_tags_warning',
+           'extract_dialog']
 
 # %% ../nbs/01_dialog.ipynb #2fb904d9
 def tag_in_cell(cell, # Dictonary of a Jupyter Notebook cell
@@ -68,7 +69,7 @@ def code_cell_content(cell:dict, # Dictonary of a Jupyter Notebook code cell
         content += f"\n\nOutput:\n```\n{rendered}\n```"
     return content
 
-# %% ../nbs/01_dialog.ipynb #5ed057b8
+# %% ../nbs/01_dialog.ipynb #b8a6aca8
 PROMPT_MAGIC = '%%prompt'
 
 def is_prompt_cell(cell:dict # Dictonary of a Jupyter Notebook cell
@@ -95,6 +96,15 @@ def notebook_upto_prompt(notebook:dict, # Jupyter Notebook JSON as a dictionary
             break
     return {'cells': cells}, found
 
+# %% ../nbs/01_dialog.ipynb #188df435
+def is_hidden(cell:dict, # Dictonary of a Jupyter Notebook cell
+              hide_tag:str='yasi-hide' # Name of the hide tag
+             )->bool: # True if the cell should not be sent to the model
+    """Checks whether a cell is hidden from the model, either via the `hide_tag` cell metadata tag
+    or via a `#| hide_tag` line in its source"""
+    if hide_tag in cell.get('metadata', {}).get('tags', []): return True
+    return tag_in_cell(cell, f'#| {hide_tag}')
+
 # %% ../nbs/01_dialog.ipynb #bd8768ba
 def multiple_tags_warning(cell # Dictonary of a Jupyter Notebook cell
                          )->str: # Markdown warning text
@@ -110,13 +120,16 @@ def extract_dialog(notebook:dict, # Jupyter Notebook JSON as a dictionary
                    tag_user:str='#| chat_user', # tag for user chat markdown cells
                    tag_assistant:str='#| chat_assistant', # tag for assistant chat markdown cells
                    all_cells:bool=True, # send untagged markdown/code cells as user messages
-                   max_output_len:int=2000 # maximum characters of rendered output per code cell
+                   max_output_len:int=2000, # maximum characters of rendered output per code cell
+                   hide_tag:str='yasi-hide' # cells with this tag (metadata or `#| ` source line) are skipped
                   )->tuple: # (messages, warnings)
     """Extracts the dialog from a notebook dictionary and turns it into a messages list.
     Returns the messages plus warning texts for cells containing multiple tags."""
     tags = {'system': tag_system, 'user': tag_user, 'assistant': tag_assistant}
     messages, warnings = [], []
     for cell in notebook['cells']:
+        if is_hidden(cell, hide_tag=hide_tag):
+            continue
         roles = cell_roles(cell, tags)
         if len(roles) > 1:
             warnings.append(multiple_tags_warning(cell))

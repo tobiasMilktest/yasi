@@ -30,7 +30,8 @@ class YasiMagics(Magics):
                                             tag_user=jc.tag_user,
                                             tag_assistant=jc.tag_assistant,
                                             all_cells=jc.all_cells,
-                                            max_output_len=jc.max_output_len)
+                                            max_output_len=jc.max_output_len,
+                                            hide_tag=jc.hide_tag)
         for warning in warnings:
             jc.create_new_markdown_cell(warning)
         if not found:

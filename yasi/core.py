@@ -28,7 +28,8 @@ class JupyterChat:
                  tag_user : str ='#| chat_user', # tag for user chat markdown cells
                  tag_assistant : str ='#| chat_assistant', # tag for assistant chat markdown cells
                  all_cells : bool =True, # send untagged markdown/code cells (incl. outputs) as user messages
-                 max_output_len : int =2000 # maximum characters of rendered output per code cell
+                 max_output_len : int =2000, # maximum characters of rendered output per code cell
+                 hide_tag : str ='yasi-hide' # cells with this tag (metadata or `#| ` source line) are hidden from the model
                 ):
         self.chat_client = ChatClient(api_key=api_key, openai_base_url=openai_base_url)
         self.client = self.chat_client.client  # kept for backward compatibility
@@ -42,6 +43,7 @@ class JupyterChat:
 
         self.all_cells = all_cells
         self.max_output_len = max_output_len
+        self.hide_tag = hide_tag
 
         self.max_tokens = None
         self.temperature = None
@@ -123,7 +125,8 @@ class JupyterChat:
                                             tag_user=self.tag_user,
                                             tag_assistant=self.tag_assistant,
                                             all_cells=self.all_cells,
-                                            max_output_len=self.max_output_len)
+                                            max_output_len=self.max_output_len,
+                                            hide_tag=self.hide_tag)
         for warning in warnings:
             self.create_new_markdown_cell(warning)
         return messages
