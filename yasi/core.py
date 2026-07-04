@@ -14,6 +14,7 @@ import json
 from .dialog import tag_in_cell, extract_dialog
 from .client import ChatClient
 from .ui import YasiUI
+from .magics import load_prompt_magic
 
 _all_ = ['tag_in_cell']
 
@@ -25,7 +26,9 @@ class JupyterChat:
                  model : str =None, # model id for the openai api
                  tag_system : str ='#| chat_system', # tag for system chat markdown cells
                  tag_user : str ='#| chat_user', # tag for user chat markdown cells
-                 tag_assistant : str ='#| chat_assistant' # tag for assistant chat markdown cells
+                 tag_assistant : str ='#| chat_assistant', # tag for assistant chat markdown cells
+                 all_cells : bool =True, # send untagged markdown/code cells (incl. outputs) as user messages
+                 max_output_len : int =2000 # maximum characters of rendered output per code cell
                 ):
         self.chat_client = ChatClient(api_key=api_key, openai_base_url=openai_base_url)
         self.client = self.chat_client.client  # kept for backward compatibility
@@ -36,6 +39,9 @@ class JupyterChat:
         self.tag_system =  tag_system
         self.tag_user = tag_user
         self.tag_assistant = tag_assistant
+
+        self.all_cells = all_cells
+        self.max_output_len = max_output_len
 
         self.max_tokens = None
         self.temperature = None
@@ -48,6 +54,11 @@ class JupyterChat:
                          on_params_change=self._on_params_change,
                          tag_user=tag_user,
                          tag_assistant=tag_assistant)
+
+        try:
+            load_prompt_magic(self)
+        except Exception:
+            pass  # not running inside IPython
 
     def __getattr__(self, name):
         # keep old attribute access like `jc.wgt_dd_model` or `jc.panel` working
@@ -88,8 +99,9 @@ class JupyterChat:
                                               presence_penalty=self.presence_penalty)
         self.latest_response = self.chat_client.latest_response
 
-        # Insert a new cell below with the assistant's response
-        self.create_new_markdown_cell(response_text.strip())
+        # Insert a new cell below with the assistant's response, tagged so
+        # the next extraction sends it with the assistant role
+        self.create_new_markdown_cell(f"{self.tag_assistant}\n\n{response_text.strip()}")
 
     def send_query(self, user_prompt: str):
         """Send user prompt to chatbot and insert response as new cell"""
@@ -104,12 +116,14 @@ class JupyterChat:
         return current_notebook
 
     def extract_notebook_dialog(self):
-        """Extracts the tagged dialog form the current notebook, and turns it into a messages list"""
+        """Extracts the dialog form the current notebook, and turns it into a messages list"""
         current_notebook = self.get_current_nb()
         messages, warnings = extract_dialog(current_notebook,
                                             tag_system=self.tag_system,
                                             tag_user=self.tag_user,
-                                            tag_assistant=self.tag_assistant)
+                                            tag_assistant=self.tag_assistant,
+                                            all_cells=self.all_cells,
+                                            max_output_len=self.max_output_len)
         for warning in warnings:
             self.create_new_markdown_cell(warning)
         return messages

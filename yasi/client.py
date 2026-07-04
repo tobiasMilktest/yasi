@@ -7,7 +7,7 @@ Docs: https://Jack-Byte.github.io/yasiclient.html.md"""
 # %% auto #0
 __all__ = ['model_entry', 'ChatClient']
 
-# %% ../nbs/02_client.ipynb #c90528ea
+# %% ../nbs/02_client.ipynb #cf5ebe5e
 def model_entry(model # A model object as returned by `client.models.list()`
                )->dict: # dict with keys company/name/id
     """Builds yasi's model dict from an API model object, tolerating provider-specific fields
