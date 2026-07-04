@@ -31,3 +31,4 @@ version = {attr = "yasi.__version__"}
 include = ["yasi"]
 
 [tool.nbdev]
+lib_path = "yasi"
